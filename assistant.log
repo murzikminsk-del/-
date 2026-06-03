@@ -1,0 +1,18 @@
+{"event": "user_input", "data": {"input": "Найди договор с Альфой и извлеки из него ключевые поля."}}
+HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+{"event": "tool_call", "data": {"name": "search_documents", "arguments": {"query": "Альфа", "department": "any", "doc_type": "contract"}}}
+{"event": "tool_result", "data": {"name": "search_documents", "result": {"query": "Альфа", "department": "any", "doc_type": "contract", "results": [{"document_id": "contract_001", "title": "Договор оказания услуг", "department": "legal", "doc_type": "contract", "summary": "Договор между ООО Урбантех-ИТ и ООО Альфа на оказание услуг по разработке программного обеспечения."}]}}}
+HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+{"event": "tool_call", "data": {"name": "extract_key_fields", "arguments": {"document_id": "contract_001"}}}
+{"event": "tool_result", "data": {"name": "extract_key_fields", "result": {"document_id": "contract_001", "title": "Договор оказания услуг", "date": "2024-01-15", "parties": ["ООО Урбантех-ИТ", "ООО Альфа"], "amount": "500000 RUB", "risks": ["Нет условия о штрафе за просрочку оплаты", "Отсутствует порядок одностороннего расторжения договора"]}}}
+HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+{"event": "final_answer", "data": {"text": "Договор с ООО Альфа — \"Договор оказания услуг\" от 15.01.2024. Стороны: ООО Урбантех-ИТ и ООО Альфа. Сумма: 500000 RUB. Риски: нет условия о штрафе за просрочку оплаты, отсутствует порядок одностороннего расторжения договора.", "total_tokens": 655}}
+{"event": "user_input", "data": {"input": "Объясни простыми словами, что такое RAG."}}
+HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+{"event": "final_answer", "data": {"text": "RAG (Retrieval-Augmented Generation) — это метод, когда для создания ответов или текста система сначала ищет нужную информацию в базе данных или документах, а потом использует найденные данные, чтобы сгенерировать более точный и полный ответ. То есть, это сочетание поиска и генерации текста.", "total_tokens": 404}}
+{"event": "user_input", "data": {"input": "Есть ли у нас документы про персональные данные?"}}
+HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+{"event": "tool_call", "data": {"name": "search_documents", "arguments": {"query": "персональные данные", "department": "any", "doc_type": "any"}}}
+{"event": "tool_result", "data": {"name": "search_documents", "result": {"query": "персональные данные", "department": "any", "doc_type": "any", "results": [{"document_id": "policy_001", "title": "Политика обработки персональных данных", "department": "hr", "doc_type": "policy", "summary": "Политика обработки персональных данных компании ООО Урбантех-ИТ. Документ про персональные данные сотрудников."}]}}}
+HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+{"event": "final_answer", "data": {"text": "Да, у нас есть документ \"Политика обработки персональных данных\" компании ООО Урбантех-ИТ, который касается персональных данных сотрудников. Хотите, я извлеку из него ключевые данные?", "total_tokens": 503}}
