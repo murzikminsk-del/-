@@ -4,20 +4,14 @@ import logging
 
 import httpx
 from openai import OpenAI
-from typer import prompt
 
-from app.config import COMPANY_NAME, OPENAI_API_KEY, OPENAI_MODEL
+import app.core.logging
+from app.core.config import COMPANY_NAME, OPENAI_API_KEY, OPENAI_MODEL
 from app.prompts.loader import render_prompt
-from app.tools.handlers import call_tool
-from app.tools.schemas import TOOLS
+from app.services.tools import call_tool
+from app.schemas.tools import TOOLS
 
-# настройка логов
-logging.basicConfig( # базовая настройка логирования
-    filename="assistant.log", # Логи будут записываться в файл assistant.log, который появится в корневой папке проекта после запуска
-    level=logging.INFO, # Уровень логирования INFO означает, что будут записываться все сообщения уровня INFO и выше (WARNING, ERROR, CRITICAL)
-    format="%(message)s", # формат логов будет содержать только само сообщение без дополнительной информации (времени, уровня и т.д.)
-    encoding="utf-8",
-)
+
 
 # настройка клиента OpenAI
 # client = OpenAI(api_key=OPENAI_API_KEY)

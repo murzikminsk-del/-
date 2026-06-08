@@ -1,0 +1,1 @@
+# Future chat endpoints: /chat, /chat/stream, /chat/batch.

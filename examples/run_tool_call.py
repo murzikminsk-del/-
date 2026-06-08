@@ -1,4 +1,4 @@
-from app.llm.client import ask_assistant
+from app.services.llm import ask_assistant
 
 
 test_queries = [
