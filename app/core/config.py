@@ -1,9 +1,31 @@
-import os
+# ищи переменные в файле .env в корне проекта
+from functools import lru_cache
+from pydantic import SecretStr, Field
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
-from dotenv import load_dotenv
+class LLMSettings(BaseSettings):
+    model_config = SettingsConfigDict(env_prefix="LLM_")
 
-load_dotenv()
+    openai_api_key: SecretStr
+    default_model: str = "gpt-5-mini"
+    request_timeout: float = 30.0
+    max_retries: int = 3
+    
+class Settings(BaseSettings):
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        env_nested_delimiter="__",
+        extra="ignore",
+    )
 
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4.1-mini")
-COMPANY_NAME = os.getenv("COMPANY_NAME", "Урбантех-ИТ")
+    app_name: str = "llm-service"
+    debug: bool = False
+    cors_origins: list[str] = Field(default_factory=lambda: ["*"])
+    redis_url: str = "redis://localhost:6379/0"
+    cache_ttl_seconds: int = 3600
+    llm: LLMSettings = Field(default_factory=LLMSettings)
+    
+@lru_cache
+def get_settings() -> Settings:
+    return Settings()

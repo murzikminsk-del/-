@@ -8,14 +8,15 @@ from openai import AsyncOpenAI
 
 import app.core.logging
 
-from app.core.config import COMPANY_NAME, OPENAI_API_KEY, OPENAI_MODEL
+from app.core.config import get_settings
+settings = get_settings()
 
 
 
 class AsyncLLMClient:
     def __init__(self, concurrency: int = 5):
         self._client = AsyncOpenAI(
-            api_key=OPENAI_API_KEY,
+            api_key=settings.llm.openai_api_key.get_secret_value(),
             timeout=30,
             max_retries=3,
             http_client=httpx.AsyncClient(trust_env=False),    
@@ -27,12 +28,12 @@ class AsyncLLMClient:
         async with asyncio.timeout(15):
             async with self._sem:
                 response = await self._client.chat.completions.create(
-                    model=OPENAI_MODEL,
+                    model=settings.llm.default_model,
                     messages=[{"role": "user", "content": prompt}],
                 )
                 result = response.choices[0].message.content
                 duration_ms = (time.perf_counter() - start) * 1000
-                logging.info(f"llm.call duration_ms={duration_ms:.0f} model={OPENAI_MODEL} prompt_chars={len(prompt)} status=ok")
+                logging.info(f"llm.call duration_ms={duration_ms:.0f} model={settings.llm.default_model} prompt_chars={len(prompt)} status=ok")
                 return result
     
     async def batch_chat(self, prompts: list[str], concurrency: int = 5) -> list[str | Exception]:
@@ -41,7 +42,7 @@ class AsyncLLMClient:
     
     async def stream_chat(self, prompt: str):
         stream = await self._client.chat.completions.create(
-            model=OPENAI_MODEL,
+            model=settings.llm.default_model,
             messages=[{"role": "user", "content": prompt}],
             stream=True,
         )

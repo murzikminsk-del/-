@@ -13,3 +13,8 @@ async def stream_endpoint(prompt: str):
         async for token in client.stream_chat(prompt):
             yield token
     return StreamingResponse(generate(), media_type="text/plain")
+
+@router.post("/chat")
+async def chat_endpoint(prompt: str):
+    result = await client.complete(prompt)
+    return {"content": result}
