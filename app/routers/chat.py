@@ -1,21 +1,24 @@
 # роутер для эндпоинтов чата
 from fastapi import APIRouter, Depends  # Depends - для dependency injection
 from fastapi.responses import StreamingResponse  # для стриминга ответа
-from app.services.llm_client import AsyncLLMClient  # наш async клиент
-from app.deps.providers import get_llm_client  # DI провайдер клиента
+
+from app.deps.providers import get_llm_service  # DI провайдер сервиса
+from app.services.llm_service import LLMService  # сервис с кешем
+from app.schemas.chat import ChatRequest, ChatResponse  # схемы
 
 router = APIRouter()  # создаём роутер
 
+
+
+# эндпоинт для обычного ответа с кешированием
+@router.post("/chat", response_model=ChatResponse)
+async def chat_endpoint(req: ChatRequest, service: LLMService = Depends(get_llm_service)):
+    return await service.complete(req)
+
 # SSE-эндпоинт для стриминга ответа по токенам
 @router.post("/chat/stream")
-async def stream_endpoint(prompt: str, client: AsyncLLMClient = Depends(get_llm_client)):  # client приходит через DI
+async def stream_endpoint(req: ChatRequest, service: LLMService = Depends(get_llm_service)):
     async def generate():
-        async for token in client.stream_chat(prompt):
+        async for token in service._client.stream_chat(req.messages[0].content):
             yield token
     return StreamingResponse(generate(), media_type="text/plain")
-
-# эндпоинт для обычного синхронного ответа
-@router.post("/chat")
-async def chat_endpoint(prompt: str, client: AsyncLLMClient = Depends(get_llm_client)):  # client приходит через DI
-    result = await client.complete(prompt)
-    return {"content": result}
