@@ -125,3 +125,50 @@ data/           # база документов (documents.json)
 - `app/observability/pii.py` — маскирование email, телефона, номера карты, ИНН, паспорта перед записью в лог; сырой промпт в логи не попадает никогда
 - `tests/test_pii.py` — 4 unit-теста для `redact_pii`, все зелёные
 - Скриншот трейса — в `docs/observability/`
+
+## Блок 3.7 — Тестирование и оценка качества
+
+Добавлен полноценный testing-слой: unit-тесты с моками и eval-инфраструктура для оценки качества ответов через LLM-as-judge.
+
+**Что сделано:**
+- `eval/golden_dataset.json` — 22 вопроса по предметной области (договоры, политики, претензии), 3 категории (`factual`, `support`, `legal`), 4 примера с `difficulty: hard`, поле `must_not_contain` для запрещённых слов
+- `tests/unit/` — 8 unit-тестов с моками, запускаются без API-ключей и без сети
+- `eval/run_evaluation.py` — CLI-скрипт прогона: вызывает сервис, оценивает ответы через judge-модель (G-Eval, reason-then-score)
+- `eval/thresholds.yaml` — пороги качества (`correctness_avg ≥ 4.0`, `min_correctness ≥ 2.0`)
+- `eval/check_thresholds.py` — проверяет последний прогон и завершается с `sys.exit(1)` при нарушении порога
+
+### Запуск unit-тестов
+
+```bash
+pytest tests/unit/ -v
+```
+
+Все тесты запускаются без сетевых вызовов и без API-ключей.
+
+### Запуск eval-прогона
+
+Требует запущенного сервиса и VPN (для доступа к OpenAI).
+
+**Шаг 1** — запустить сервис (в отдельном терминале):
+
+```bash
+$env:REDIS_URL="redis://localhost:6379/0"; uvicorn app.main:app --port 8000
+```
+
+**Шаг 2** — запустить прогон:
+
+```bash
+$env:PYTHONPATH = "."; python eval/run_evaluation.py --golden eval/golden_dataset.json --judge gpt-4.1-mini --out eval/runs/2026-08-03.json
+```
+
+**Шаг 3** — проверить пороги:
+
+```bash
+$env:PYTHONPATH = "."; python eval/check_thresholds.py
+```
+
+Результаты прогона сохраняются в `eval/runs/<YYYY-MM-DD>.json` и читаются через `jq`:
+
+```bash
+jq '.aggregates.correctness_avg' eval/runs/2026-08-03.json
+```

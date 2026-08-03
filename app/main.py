@@ -27,9 +27,9 @@ async def lifespan(app: FastAPI):
         api_key=settings.llm.openai_api_key.get_secret_value(),
         timeout=settings.llm.request_timeout,
         max_retries=settings.llm.max_retries,
-        http_client=httpx.AsyncClient(trust_env=False),
+        http_client=httpx.AsyncClient(trust_env=False, verify=False),
     )
-    app.state.cache = Redis.from_url(settings.redis_url)
+    app.state.cache = Redis.from_url(settings.redis_url, protocol=2)
     yield
     await app.state.openai.close()
     await app.state.cache.aclose()

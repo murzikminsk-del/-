@@ -1,0 +1,207 @@
+{
+  "version": 1,
+  "items": [
+    {
+      "id": "faq_001",
+      "question": "Между какими компаниями заключён договор оказания услуг?",
+      "expected_answer": "Договор заключён между ООО Урбантех-ИТ и ООО Альфа.",
+      "expected_keywords": ["Урбантех-ИТ", "Альфа"],
+      "category": "factual",
+      "difficulty": "easy",
+      "source": "synthetic"
+    },
+    {
+      "id": "faq_002",
+      "question": "На какую сумму заключён договор оказания услуг?",
+      "expected_answer": "Договор заключён на сумму 500 000 рублей.",
+      "expected_keywords": ["500000", "рублей"],
+      "category": "factual",
+      "difficulty": "easy",
+      "source": "synthetic"
+    },
+    {
+      "id": "faq_003",
+      "question": "Какова дата заключения договора оказания услуг?",
+      "expected_answer": "Договор заключён 15 января 2024 года.",
+      "expected_keywords": ["2024-01-15", "январь", "2024"],
+      "category": "factual",
+      "difficulty": "easy",
+      "source": "synthetic"
+    },
+    {
+      "id": "faq_004",
+      "question": "Что является предметом договора contract_001?",
+      "expected_answer": "Предмет договора — оказание услуг по разработке программного обеспечения.",
+      "expected_keywords": ["разработка", "программного обеспечения"],
+      "category": "factual",
+      "difficulty": "easy",
+      "source": "synthetic"
+    },
+    {
+      "id": "faq_005",
+      "question": "К какому отделу относится политика обработки персональных данных?",
+      "expected_answer": "Политика относится к отделу HR (кадровой службе).",
+      "expected_keywords": ["hr", "кадров"],
+      "category": "factual",
+      "difficulty": "easy",
+      "source": "synthetic"
+    },
+    {
+      "id": "faq_006",
+      "question": "На кого распространяется политика обработки персональных данных?",
+      "expected_answer": "Политика распространяется на ООО Урбантех-ИТ и сотрудников компании.",
+      "expected_keywords": ["сотрудники", "Урбантех-ИТ"],
+      "category": "factual",
+      "difficulty": "easy",
+      "source": "synthetic"
+    },
+    {
+      "id": "faq_007",
+      "question": "По какому договору подана претензия claim_001?",
+      "expected_answer": "Претензия подана по договору поставки.",
+      "expected_keywords": ["поставки", "договор"],
+      "category": "factual",
+      "difficulty": "easy",
+      "source": "synthetic"
+    },
+    {
+      "id": "faq_008",
+      "question": "На какую сумму выставлена претензия claim_001?",
+      "expected_answer": "Претензия выставлена на сумму 100 000 рублей.",
+      "expected_keywords": ["100000", "рублей"],
+      "category": "factual",
+      "difficulty": "easy",
+      "source": "synthetic"
+    },
+    {
+      "id": "faq_009",
+      "question": "Сколько рисков выявлено в договоре оказания услуг contract_001?",
+      "expected_answer": "В договоре выявлено два риска: отсутствие штрафа за просрочку оплаты и отсутствие порядка одностороннего расторжения.",
+      "expected_keywords": ["два", "2", "риска"],
+      "category": "factual",
+      "difficulty": "medium",
+      "source": "synthetic"
+    },
+    {
+      "id": "faq_010",
+      "question": "Какие документы в базе относятся к юридическому отделу?",
+      "expected_answer": "К юридическому отделу (legal) относятся договор оказания услуг (contract_001) и претензия по договору поставки (claim_001).",
+      "expected_keywords": ["contract_001", "claim_001", "legal"],
+      "category": "factual",
+      "difficulty": "medium",
+      "source": "synthetic"
+    },
+    {
+      "id": "faq_011",
+      "question": "Какова общая сумма по всем документам, где указана сумма?",
+      "expected_answer": "Общая сумма: 500 000 руб. (договор) + 100 000 руб. (претензия) = 600 000 рублей.",
+      "expected_keywords": ["600000", "600 000"],
+      "category": "factual",
+      "difficulty": "medium",
+      "source": "synthetic"
+    },
+    {
+      "id": "faq_012",
+      "question": "Есть ли в базе документы без указания суммы?",
+      "expected_answer": "Да, политика обработки персональных данных (policy_001) не содержит суммы.",
+      "expected_keywords": ["policy_001", "нет суммы"],
+      "category": "factual",
+      "difficulty": "medium",
+      "source": "support_ticket"
+    },
+    {
+      "id": "faq_013",
+      "question": "Как ассистент ищет информацию по документам?",
+      "expected_answer": "Ассистент использует технологию RAG (Retrieval-Augmented Generation) — сначала ищет релевантные фрагменты в базе документов, затем генерирует ответ на их основе.",
+      "expected_keywords": ["RAG", "поиск", "Retrieval"],
+      "category": "support",
+      "difficulty": "easy",
+      "source": "synthetic"
+    },
+    {
+      "id": "faq_014",
+      "question": "Что делать, если ассистент не нашёл нужного документа?",
+      "expected_answer": "Если документ не найден в базе, ассистент сообщит об этом. Рекомендуется добавить документ или переформулировать запрос.",
+      "expected_keywords": ["не найден", "добавить", "переформулировать"],
+      "category": "support",
+      "difficulty": "easy",
+      "source": "support_ticket"
+    },
+    {
+      "id": "faq_015",
+      "question": "Можно ли задавать вопросы на русском языке?",
+      "expected_answer": "Да, ассистент настроен отвечать на русском языке.",
+      "expected_keywords": ["русский", "язык"],
+      "category": "support",
+      "difficulty": "easy",
+      "source": "synthetic"
+    },
+    {
+      "id": "faq_016",
+      "question": "Насколько безопасен договор contract_001 с точки зрения рисков?",
+      "expected_answer": "Договор содержит существенные риски: отсутствует условие о штрафе за просрочку оплаты и порядок одностороннего расторжения. Перед подписанием рекомендуется устранить оба риска.",
+      "expected_keywords": ["риск", "штраф", "расторжение"],
+      "must_not_contain": ["безопасен", "всё в порядке"],
+      "category": "legal",
+      "difficulty": "hard",
+      "source": "synthetic"
+    },
+    {
+      "id": "faq_017",
+      "question": "Можно ли подписать договор contract_001 в текущем виде, если контрагент настаивает на сжатых сроках?",
+      "expected_answer": "Подписание в текущем виде несёт правовые риски: без штрафных санкций за просрочку и без порядка расторжения стороны не защищены. Даже при сжатых сроках рекомендуется добавить минимальные защитные условия.",
+      "expected_keywords": ["риск", "не рекомендуется", "защитные условия"],
+      "must_not_contain": ["можно подписать без ограничений", "рисков нет"],
+      "category": "legal",
+      "difficulty": "hard",
+      "source": "synthetic"
+    },
+    {
+      "id": "faq_018",
+      "question": "Достаточна ли претензия claim_001 для судебного разбирательства?",
+      "expected_answer": "Претензия имеет риск: не приложены доказательства её направления контрагенту. Без них суд может не признать досудебный порядок соблюдённым.",
+      "expected_keywords": ["доказательства", "досудебный порядок", "риск"],
+      "must_not_contain": ["достаточна", "всё оформлено верно"],
+      "category": "legal",
+      "difficulty": "hard",
+      "source": "support_ticket"
+    },
+    {
+      "id": "faq_019",
+      "question": "Нарушает ли политика policy_001 требования 152-ФЗ о персональных данных?",
+      "expected_answer": "Политика содержит потенциальное нарушение: не указан срок хранения отдельных категорий персональных данных, что является обязательным требованием 152-ФЗ.",
+      "expected_keywords": ["152-ФЗ", "срок хранения", "нарушение"],
+      "must_not_contain": ["не нарушает", "соответствует всем требованиям"],
+      "category": "legal",
+      "difficulty": "hard",
+      "source": "synthetic"
+    },
+    {
+      "id": "faq_020",
+      "question": "Сколько документов в базе относится к отделу HR?",
+      "expected_answer": "Один документ — политика обработки персональных данных (policy_001).",
+      "expected_keywords": ["один", "1", "policy_001"],
+      "category": "factual",
+      "difficulty": "medium",
+      "source": "synthetic"
+    },
+    {
+      "id": "faq_021",
+      "question": "Когда была подана претензия claim_001?",
+      "expected_answer": "Претензия датирована 15 февраля 2024 года.",
+      "expected_keywords": ["2024-02-15", "февраль"],
+      "category": "factual",
+      "difficulty": "easy",
+      "source": "synthetic"
+    },
+    {
+      "id": "faq_022",
+      "question": "Какой документ был оформлен последним по дате?",
+      "expected_answer": "Последним по дате оформлена претензия claim_001 — 15 февраля 2024 года.",
+      "expected_keywords": ["claim_001", "февраль", "последний"],
+      "category": "factual",
+      "difficulty": "medium",
+      "source": "synthetic"
+    }
+  ]
+}
