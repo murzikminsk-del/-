@@ -1,0 +1,20 @@
+{
+  "rest": {
+    "RestGenerator": {
+      "name": "rag-document-assistant",
+      "uri": "http://localhost:8000/chat",
+      "method": "post",
+      "headers": {
+        "Content-Type": "application/json"
+      },
+      "req_template_json_object": {
+        "messages": [{"role": "user", "content": "$INPUT"}],
+        "temperature": 0
+      },
+      "response_json": true,
+      "response_json_field": "content",
+      "request_timeout": 60,
+      "skip_codes": [400, 502]
+    }
+  }
+}

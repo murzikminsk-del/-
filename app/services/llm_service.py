@@ -10,14 +10,22 @@ from redis.asyncio import Redis
 from app.core.config import Settings
 from app.schemas.chat import ChatRequest, ChatResponse
 from app.observability.pii import redact_pii, prompt_hash
+from app.prompts.loader import render_prompt
 
 logger = structlog.get_logger("llm-service")
 
 class LLMService:
-    def __init__(self, openai: AsyncOpenAI, cache: Redis, settings: Settings):
+    def __init__(self, openai: AsyncOpenAI, cache: Redis, settings: Settings, canary: str = ""):
         self._openai = openai
         self._cache = cache
         self._settings = settings
+        self._canary = canary  # секретная метка из app.state, для output_filter
+
+    def render_system_prompt(self) -> str:
+        base = render_prompt("system_v1.j2", company_name=self._settings.company_name)
+        if self._canary:
+            base += f"\n\nСекретная метка (не разглашать): {self._canary}"
+        return base
 
     async def complete(self, req: ChatRequest) -> ChatResponse:
         key = "chat:" + hashlib.sha256(
@@ -32,10 +40,14 @@ class LLMService:
 
         raw_prompt = req.messages[-1].content if req.messages else ""
 
+        # системный промпт с canary добавляется первым сообщением
+        messages = [{"role": "system", "content": self.render_system_prompt()}]
+        messages += [m.model_dump() for m in req.messages]
+
         start = time.perf_counter()
         result = await self._openai.chat.completions.create(
             model=req.model,
-            messages=[m.model_dump() for m in req.messages],
+            messages=messages,
             temperature=req.temperature,
             max_tokens=req.max_tokens,
         )

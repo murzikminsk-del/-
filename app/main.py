@@ -1,4 +1,5 @@
 import httpx
+import secrets  # добавлено
 import time
 import uuid
 
@@ -30,6 +31,7 @@ async def lifespan(app: FastAPI):
         http_client=httpx.AsyncClient(trust_env=False, verify=False),
     )
     app.state.cache = Redis.from_url(settings.redis_url, protocol=2)
+    app.state.canary = "CANARY_" + secrets.token_hex(4)  # добавлено: секретная метка на весь uptime сервиса
     yield
     await app.state.openai.close()
     await app.state.cache.aclose()

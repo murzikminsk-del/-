@@ -13,6 +13,7 @@ dependencies = [
     "structlog>=24.0",
     "arize-phoenix-otel>=0.6",
     "openinference-instrumentation-openai>=0.1",
+    "garak>=0.15.1",
 ]
 
 [dependency-groups]

@@ -16,3 +16,9 @@ HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
 {"event": "tool_result", "data": {"name": "search_documents", "result": {"query": "персональные данные", "department": "any", "doc_type": "any", "results": [{"document_id": "policy_001", "title": "Политика обработки персональных данных", "department": "hr", "doc_type": "policy", "summary": "Политика обработки персональных данных компании ООО Урбантех-ИТ. Документ про персональные данные сотрудников."}]}}}
 HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
 {"event": "final_answer", "data": {"text": "Да, у нас есть документ \"Политика обработки персональных данных\" компании ООО Урбантех-ИТ, который касается персональных данных сотрудников. Хотите, я извлеку из него ключевые данные?", "total_tokens": 503}}
+HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+llm.call duration_ms=4135 model=gpt-4.1-mini prompt_chars=7 status=ok
+HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+llm.call duration_ms=4593 model=gpt-4.1-mini prompt_chars=7 status=ok

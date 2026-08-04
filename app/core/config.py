@@ -20,6 +20,7 @@ class Settings(BaseSettings):
     )
 
     app_name: str = "llm-service"
+    company_name: str = "Acme"
     debug: bool = False
     cors_origins: list[str] = Field(default_factory=lambda: ["*"])
     redis_url: str = "redis://localhost:6379/0"

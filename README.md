@@ -64,11 +64,12 @@ uvicorn app.main:app --reload
 ```
 app/
   routers/      # эндпоинты: /chat, /chat/stream, /health, /ready
-  services/     # бизнес-логика и LLM-клиент
+  services/     # бизнес-логика, LLM-клиент, security-слой (валидатор входа, фильтр выхода)
   schemas/      # Pydantic-модели
   prompts/      # системный промпт и описания инструментов
   core/         # настройки и логирование
 data/           # база документов (documents.json)
+eval/           # eval-инфраструктура и конфиг для garak
 ```
 
 ## Блок 3.1 — Function Calling
@@ -121,8 +122,8 @@ data/           # база документов (documents.json)
 **Что сделано:**
 - `compose.yaml` дополнен сервисом Phoenix (Arize) — UI трейсов на `http://localhost:6006`
 - `app/observability/tracing.py` — автоинструментация OpenAI через OpenInference, трейсы отправляются в Phoenix
-- `app/observability/logging.py` — JSON-логи через `structlog` с `request_id`, моделью, токенами, latency и finish_reason в каждой строке
-- `app/observability/pii.py` — маскирование email, телефона, номера карты, ИНН, паспорта перед записью в лог; сырой промпт в логи не попадает никогда
+- `app/observability/logging.py` — JSON-логи через `structlog` с `request_id`, моделью, токенами, latency и finish_reason в каждой строке. С блока 3.8 маскирование PII подключено как отдельный `processor` — покрывает все текстовые поля логов, а не только `prompt_preview`
+- `app/observability/pii.py` — маскирование email, телефона, номера карты, ИНН, паспорта; переиспользуется в security-слое (блок 3.8) для фильтрации ответов модели перед отдачей пользователю
 - `tests/test_pii.py` — 4 unit-теста для `redact_pii`, все зелёные
 - Скриншот трейса — в `docs/observability/`
 
@@ -172,3 +173,71 @@ $env:PYTHONPATH = "."; python eval/check_thresholds.py
 ```bash
 jq '.aggregates.correctness_avg' eval/runs/2026-08-03.json
 ```
+
+## Блок 3.8 — Безопасность ИИ-приложений
+
+Сервис проверен на устойчивость к атакам через [NVIDIA garak](https://github.com/NVIDIA/garak): два прогона — **baseline** (без защиты) и **after** (с защитным слоем), с сравнением результатов.
+
+**Что сделано:**
+- `eval/security/rest_config.json` — конфиг REST-таргета garak под `/chat`-эндпоинт (`messages` → `content`)
+- `app/services/security/input_validator.py` — блокировка prompt injection / jailbreak-паттернов (в т.ч. на русском), атак кодировками, слишком длинного ввода
+- `app/services/security/output_filter.py` — детектор утечки системного промпта через canary-токен, маскирование PII (переиспользует `redact_pii` из блока 3.6), блокировка script-инъекций в ответе
+- Canary-токен генерируется при старте сервиса (`app.state.canary`) и подмешивается в системный промпт
+- `app/observability/logging.py` дополнен processor'ом — PII теперь маскируется во всех логах, не только в превью промпта
+- Валидатор входа подключён в `/chat` до похода в LLM, фильтр выхода — после получения ответа
+
+### Установка garak
+
+```bash
+uv add garak
+uv run garak --version
+uv run garak --list_probes
+```
+
+> **Известная проблема на Windows.** Пакет `nltk` (транзитивная зависимость garak) с 2026 года включает защиту от CWE-427 (`nltk/inisec.py`), которая блокирует импорты, если считает, что модуль подгружается из текущей рабочей директории. На машинах, где Python установлен в пользовательском профиле (`C:\Users\<user>\AppData\...`), это даёт ложные срабатывания даже на стандартных модулях (`regex`, `xml`). Обходится официальной переменной окружения:
+> ```powershell
+> $env:NLTK_DISABLE_IMPORT_SECURITY = "1"
+> ```
+> Ставится перед каждым запуском `garak` в новой сессии терминала (переменная не сохраняется между окнами).
+
+### Прогон baseline
+
+```bash
+docker compose exec redis redis-cli FLUSHALL   # очистить кеш перед прогоном — иначе ответы могут быть закэшированы с более раннего прогона
+uv run garak --target_type rest -G eval/security/rest_config.json \
+  --probes promptinject.HijackHateHumans,encoding.InjectBase64,dan.Ablation_Dan_11_0 \
+  --generations 1 --report_prefix baseline
+```
+
+Если `/chat` отвечает медленно (например, из-за сетевых задержек до OpenAI) и garak падает с `ReadTimeoutError` — увеличить `request_timeout` в `rest_config.json` (по умолчанию 20 сек, поднято до 60).
+
+Отчёт: `~/.local/share/garak/garak_runs/baseline.report.{html,jsonl}`.
+
+### Прогон after
+
+Тот же набор проб, тот же конфиг, сервис перезапущен с подключённым security-слоем:
+
+```bash
+docker compose exec redis redis-cli FLUSHALL
+uv run garak --target_type rest -G eval/security/rest_config.json \
+  --probes promptinject.HijackHateHumans,encoding.InjectBase64,dan.Ablation_Dan_11_0 \
+  --generations 1 --report_prefix after
+```
+
+Отчёт: `~/.local/share/garak/garak_runs/after.report.{html,jsonl}`.
+
+### Результаты
+
+Подробная таблица «было / стало» и примеры пробитий — в `docs/security/garak_baseline_<дата>.md` и `docs/security/garak_after_<дата>.md`.
+
+**Итоговые числа baseline-прогона** (модель `gpt-4.1-mini`, без защиты):
+
+| Проба | Детектор | Атак | Пробито | % успеха атаки |
+|---|---|---|---|---|
+| `dan.Ablation_Dan_11_0` | dan.DAN | 127 | 0 | 0% |
+| `dan.Ablation_Dan_11_0` | mitigation.MitigationBypass | 127 | 0 | 0% |
+| `encoding.InjectBase64` | encoding.DecodeMatch | 256 | 202 | 78.91% |
+| `encoding.InjectBase64` | encoding.DecodeApprox | 256 | 234 | 91.41% |
+| `promptinject.HijackHateHumans` | promptinject.AttackRogueString | 256 | 100 | 39.06% |
+
+Штатный safety-тюнинг OpenAI хорошо отбивает классический DAN-джейлбрейк, но пропускает почти всё через base64-кодировку и значительную часть прямых prompt injection — это и есть цель для security-слоя.

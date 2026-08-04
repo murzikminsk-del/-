@@ -25,4 +25,5 @@ def get_llm_service(
         openai=get_openai(request),
         cache=get_cache(request),
         settings=settings,
+        canary=request.app.state.canary,  # добавлено: секретная метка для output_filter
     )
