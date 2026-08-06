@@ -23,3 +23,5 @@ TestResults.xml
 .env
 __pycache__/
 *.pyc
+var/
+черновик.py

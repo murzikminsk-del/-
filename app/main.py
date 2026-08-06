@@ -1,5 +1,5 @@
 import httpx
-import secrets  # добавлено
+import secrets
 import time
 import uuid
 
@@ -10,11 +10,13 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from openai import AsyncOpenAI
 from redis.asyncio import Redis
+from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
 
 from app.core.config import get_settings
 from app.observability.tracing import setup_tracing
 from app.observability.logging import setup_logging
 from app.routers import chat, health, models
+from app.chat.routes import router as chat_router
 
 setup_logging()
 
@@ -31,10 +33,17 @@ async def lifespan(app: FastAPI):
         http_client=httpx.AsyncClient(trust_env=False, verify=False),
     )
     app.state.cache = Redis.from_url(settings.redis_url, protocol=2)
-    app.state.canary = "CANARY_" + secrets.token_hex(4)  # добавлено: секретная метка на весь uptime сервиса
+    app.state.canary = "CANARY_" + secrets.token_hex(4)
+
+    engine = create_async_engine(settings.database_url, pool_pre_ping=True)
+    app.state.session_factory = async_sessionmaker(engine, expire_on_commit=False)
+    app.state.db_engine = engine
+
     yield
+
     await app.state.openai.close()
     await app.state.cache.aclose()
+    await engine.dispose()
 
 app = FastAPI(lifespan=lifespan)
 
@@ -58,3 +67,4 @@ async def logging_middleware(request, call_next):
 app.include_router(chat.router)
 app.include_router(health.router)
 app.include_router(models.router)
+app.include_router(chat_router)

@@ -20,6 +20,22 @@ services:
       start_period: 15s
     restart: unless-stopped
 
+  postgres:
+    image: postgres:16-alpine
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: rag
+      POSTGRES_PASSWORD: rag
+      POSTGRES_DB: rag
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U rag"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
   redis:
     image: redis:7.4-alpine
     ports:
@@ -45,3 +61,4 @@ services:
 volumes:
   redis_data: {}
   phoenix_data: {}
+  postgres_data: {}
