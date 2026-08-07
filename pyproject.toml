@@ -20,6 +20,7 @@ dependencies = [
     "aiofiles>=23.0",
     "tiktoken>=0.7",
     "pysocks>=1.7.1",
+    "aiogram>=3.27",
 ]
 
 [dependency-groups]

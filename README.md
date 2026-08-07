@@ -241,3 +241,55 @@ uv run garak --target_type rest -G eval/security/rest_config.json \
 | `promptinject.HijackHateHumans` | promptinject.AttackRogueString | 256 | 100 | 39.06% |
 
 Штатный safety-тюнинг OpenAI хорошо отбивает классический DAN-джейлбрейк, но пропускает почти всё через base64-кодировку и значительную часть прямых prompt injection — это и есть цель для security-слоя.
+
+## Блок 4.1 — Архитектура чата и хранение истории
+
+Добавлен полноценный чат-сервис с персистентной историей диалога и контекстным окном.
+
+**Что сделано:**
+- `app/chat/domain.py` — доменные модели `Chat` и `ChatMessage` (Pydantic v2)
+- `app/chat/repository.py` — `ChatRepository` как `typing.Protocol` (структурная типизация)
+- `app/chat/repositories/json_repo.py` — JSONL-репозиторий с soft delete (маркер `{"type":"soft_delete"}`)
+- `app/chat/repositories/pg_repo.py` + `pg_models.py` — PostgreSQL-репозиторий через async SQLAlchemy 2.x
+- `app/chat/service.py` — `ChatService`: две стратегии контекста (sliding window / hybrid), подсчёт токенов через tiktoken
+- `app/chat/routes.py` — 5 эндпоинтов: `POST /chats`, `GET /chats/{id}`, `POST /chats/{id}/messages` (SSE-стрим), `GET /chats/{id}/messages`, `DELETE /chats/{id}/messages` (soft delete)
+- `alembic/` — миграция `0001_chat_tables` (таблицы `chats` + `chat_messages`, partial index по `deleted_at`)
+- `tests/chat/` — 5 тестов контракта репозитория, все зелёные
+
+**Стратегия контекста:** sliding window (последние 10 сообщений). Переключение через `CHAT_CONTEXT_STRATEGY=hybrid`.
+
+**Переключение хранилища:**
+
+```bash
+CHAT_REPOSITORY=json          # dev (по умолчанию)
+CHAT_REPOSITORY=postgres      # prod, требует: alembic upgrade head
+```
+
+Подробнее — в `docs/chat.md`.
+
+## Блок 4.2 — Telegram-бот как тонкий клиент
+
+Telegram-бот на aiogram 3, который ходит в chat-сервис из Б4.1 за всей LLM-логикой. Бот не знает про LLM и не хранит историю — это backend.
+
+**Что сделано:**
+- `bot/__main__.py` — точка входа: `Bot`, `Dispatcher`, `MemoryStorage`, регистрация команд через `set_my_commands`
+- `bot/config.py` — `Settings`: `BOT_TOKEN`, `BACKEND_URL`, `BOT_ADMIN_IDS`
+- `bot/services/backend_client.py` — async httpx-клиент: `get_or_create_chat`, `send_message` (SSE-стрим), `clear_messages`
+- `bot/handlers/commands.py` — `/start`, `/help`, `/clear`, `/cancel`
+- `bot/handlers/text.py` — нон-командные сообщения → SSE-стрим → `edit_text` с троттлингом
+- `bot/handlers/fsm.py` — сценарий `/ask`: тема → вопрос → ответ (aiogram FSM)
+- `bot/keyboards/inline.py` — `topics_kb()`: Юридическая консультация, Концессии и договоры, Корпоративный блок, Регламенты и политики
+- `bot/states.py` — `AskFlow`: `waiting_for_topic`, `waiting_for_question`, `confirming`
+- `tests/bot/` — 6 тестов (MockTransport + FSM-моки), все зелёные
+
+**Запуск:**
+
+```bash
+# Терминал 1 — backend
+uvicorn app.main:app --reload
+
+# Терминал 2 — бот
+python -m bot
+```
+
+Бот доступен в Telegram по токену из `.env` (`BOT_TOKEN`). Токен не коммитится в git.
