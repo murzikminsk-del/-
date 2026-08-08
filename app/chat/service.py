@@ -24,7 +24,13 @@ def count_tokens(messages: list[dict]) -> int:
     total = 0
     for m in messages:
         total += 4
-        total += len(_enc.encode(m["content"]))
+        content = m["content"]
+        if isinstance(content, str):
+            total += len(_enc.encode(content))
+        elif isinstance(content, list):
+            for part in content:
+                if part.get("type") == "text":
+                    total += len(_enc.encode(part["text"]))
         total += len(_enc.encode(m.get("role", "")))
     return total + 2
 
@@ -109,8 +115,7 @@ class ChatService:
         return resp.choices[0].message.content.strip()
 
     async def send_message(
-        self, chat_id: UUID, user_content: str
-    ) -> AsyncIterator[str]:
+        self, chat_id: UUID, user_content: str, media_part: dict | None = None) -> AsyncIterator[str]:
         chat = await self._repo.get_chat(chat_id)
         if chat is None:
             raise ValueError(f"Chat {chat_id} not found")
@@ -119,15 +124,22 @@ class ChatService:
         await self._repo.append_message(chat_id, user_msg)
 
         messages = await self._build_context(chat)
-        messages.append({"role": "user", "content": user_content})
+        if media_part:
+            messages.append({"role": "user", "content": [
+                {"type": "text", "text": user_content},
+                media_part,
+            ]})
+        else:
+            messages.append({"role": "user", "content": user_content})
         messages = fit_to_budget(messages)
-
+        
         full_response = []
         stream = await self._llm.chat.completions.create(
             model="gpt-4.1-mini",
             messages=messages,
             stream=True,
         )
+                       
         async for chunk in stream:
             delta = chunk.choices[0].delta.content or ""
             if delta:

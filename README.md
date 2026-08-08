@@ -293,3 +293,38 @@ python -m bot
 ```
 
 Бот доступен в Telegram по токену из `.env` (`BOT_TOKEN`). Токен не коммитится в git.
+
+Запуск:
+
+
+Запускаем — сначала нужен uvicorn в первом терминале:
+$env:HTTPS_PROXY = "socks5://127.0.0.1:10808"; $env:HTTP_PROXY = "socks5://127.0.0.1:10808"; uvicorn app.main:app --reload
+
+uvicorn (первый терминал) = backend/API = это как сервер OpenClaw — он принимает запросы, общается с LLM, хранит историю
+
+
+Потом во втором терминале:
+python -m bot
+
+python -m bot (второй терминал) = Telegram = это как браузер с OpenClaw UI — пользовательский интерфейс, который ходит в backend
+
+## Блок 4.3 — Мультимодальность и стриминг
+
+Бот и бэкенд расширены поддержкой медиафайлов: изображений, голосовых сообщений и документов (PDF, DOCX).
+
+**Что сделано:**
+- `app/chat/media.py` — `media_to_part()`: конвертер байт + MIME → часть сообщения OpenAI. Изображения → Vision API, аудио → Whisper-1 (транскрипция), PDF → pypdf, DOCX → python-docx
+- `app/chat/routes.py` — эндпоинт `POST /chats/{id}/messages` мигрирован с JSON на `multipart/form-data` (поля `content` + необязательный `file`). Формат SSE обновлён: `{"type":"token","delta":"..."}` и `{"type":"done"}`
+- `app/chat/service.py` — `send_message` принимает `media_part: dict | None`; `count_tokens` обновлён для multipart-контента
+- `bot/handlers/media.py` — хендлеры `F.photo`, `F.voice`, `F.document`: скачивают файл через Bot API, отправляют на бэкенд вместе с текстом
+- `bot/services/backend_client.py` — `send_message` принимает `media: bytes | None, mime: str | None`; парсинг SSE обновлён под новый формат
+- `tests/bot/test_media.py` — 3 теста медиа-хендлеров; `test_backend_client.py` обновлён под новый SSE
+
+**Поддерживаемые форматы:**
+
+| Тип | MIME | Обработка |
+|-----|------|-----------|
+| Фото | `image/jpeg` | OpenAI Vision — описание изображения |
+| Голосовое | `audio/ogg` | Whisper-1 — транскрипция → ответ |
+| PDF | `application/pdf` | pypdf — извлечение текста |
+| DOCX | `application/vnd.openxmlformats-officedocument.wordprocessingml.document` | python-docx — извлечение текста |

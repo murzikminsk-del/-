@@ -42,9 +42,15 @@ async def test_clear_messages_sends_delete():
 async def test_send_message_parses_sse():
     chat_id = UUID("550e8400-e29b-41d4-a716-446655440000")
     tokens = ["Привет", "!", " Как", " дела"]
-    body = "".join(f"data: {json.dumps(t)}\n\n" for t in tokens) + "data: [DONE]\n\n"
+    body = (
+        "".join(
+            f'data: {json.dumps({"type": "token", "delta": t})}\n\n'
+            for t in tokens
+        )
+        + 'data: {"type":"done"}\n\n'
+    )
 
-    def handler(request: httpx.Request) -> httpx.Response:
+    def handler(request):
         return httpx.Response(200, text=body, headers={"content-type": "text/event-stream"})
 
     client = make_client(httpx.MockTransport(handler))

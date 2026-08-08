@@ -1,12 +1,13 @@
 import json
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 from app.chat.domain import Chat, ChatMessage
 from app.chat.deps import get_chat_service
+from app.chat.media import media_to_part
 from app.chat.service import ChatService
 
 router = APIRouter(prefix="/chats", tags=["chats"])
@@ -20,10 +21,6 @@ class CreateChatIn(BaseModel):
 
 class CreateChatOut(BaseModel):
     chat_id: UUID
-
-
-class MessageIn(BaseModel):
-    content: str
 
 
 @router.post("", response_model=CreateChatOut)
@@ -53,19 +50,27 @@ async def get_chat(
 @router.post("/{chat_id}/messages")
 async def post_message(
     chat_id: UUID,
-    body: MessageIn,
+    request: Request,
+    content: str = Form(...),
+    file: UploadFile | None = File(default=None),
     chat_service: ChatService = Depends(get_chat_service),
 ) -> StreamingResponse:
+    media_part = None
+    if file is not None:
+        file_bytes = await file.read()
+        mime = file.content_type or "application/octet-stream"
+        media_part = await media_to_part(file_bytes, mime, request.app.state.openai)
+
     async def event_source():
         try:
             async for chunk in chat_service.send_message(
-                chat_id=chat_id, user_content=body.content
+                chat_id=chat_id, user_content=content, media_part=media_part
             ):
-                yield f"data: {json.dumps(chunk, ensure_ascii=False)}\n\n"
+                yield f"data: {json.dumps({'type': 'token', 'delta': chunk}, ensure_ascii=False)}\n\n"
         except ValueError as e:
             yield f"data: {json.dumps({'error': str(e)})}\n\n"
         finally:
-            yield "data: [DONE]\n\n"
+            yield 'data: {"type":"done"}\n\n'
 
     return StreamingResponse(event_source(), media_type="text/event-stream")
 
