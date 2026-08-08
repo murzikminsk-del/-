@@ -1,13 +1,14 @@
-import time
+import asyncio
 
 from aiogram import F, Router
-from aiogram.exceptions import TelegramRetryAfter
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
 
 from bot.keyboards.inline import topics_kb
 from bot.services.backend_client import BackendClient
+from bot.services.streaming import stream_to_chat
+from bot.services.typing import typing_until
 from bot.states import AskFlow
 
 router = Router()
@@ -33,36 +34,21 @@ async def on_topic(callback: CallbackQuery, state: FSMContext) -> None:
 
 
 @router.message(AskFlow.waiting_for_question, F.text)
-async def on_question(
-    message: Message,
-    state: FSMContext,
-    backend: BackendClient,
-) -> None:
+async def on_question(message: Message, state: FSMContext, backend: BackendClient) -> None:
     data = await state.get_data()
     prompt = f"Тема: {data['topic']}. Вопрос: {message.text}"
+    stop = asyncio.Event()
+    task = asyncio.create_task(typing_until(message.bot, message.chat.id, stop))
     try:
         chat_id = await backend.get_or_create_chat(
             owner_external_id=str(message.chat.id),
             interface="telegram",
         )
-        placeholder = await message.answer("...")
-        buffer = ""
-        last_edit = time.time()
-        async for token in await backend.send_message(chat_id, prompt):
-            buffer += token
-            if time.time() - last_edit >= 0.05:
-                try:
-                    await placeholder.edit_text(buffer)
-                    last_edit = time.time()
-                except TelegramRetryAfter:
-                    pass
-        if buffer:
-            try:
-                await placeholder.edit_text(buffer)
-            except Exception as e:
-                if "message is not modified" not in str(e):
-                    raise
+        events = await backend.send_message(chat_id, prompt)
+        await stream_to_chat(message, events)
     except Exception:
         await message.answer("Не удалось получить ответ. Попробуйте позже.")
     finally:
+        stop.set()
+        await task
         await state.clear()
