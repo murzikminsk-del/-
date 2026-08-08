@@ -19,6 +19,7 @@ class Settings(BaseSettings):
         env_file_encoding="utf-8",
         env_nested_delimiter="__",
         extra="ignore",
+        
     )
 
     app_name: str = "llm-service"
@@ -35,6 +36,9 @@ class Settings(BaseSettings):
     chat_storage_dir: Path = Path("./var/chats")
     chat_context_strategy: Literal["sliding", "hybrid"] = "sliding"
     chat_context_window: int = 10
+    admin_token: SecretStr = SecretStr("change-me-admin")
+    internal_token: SecretStr = SecretStr("change-me-internal")
+    bot_url: str = "http://bot:9000"
 
 @lru_cache
 def get_settings() -> Settings:

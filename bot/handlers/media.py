@@ -1,4 +1,5 @@
 import asyncio
+import httpx
 
 from aiogram import F, Router
 from aiogram.types import Message
@@ -6,6 +7,8 @@ from aiogram.types import Message
 from bot.services.backend_client import BackendClient
 from bot.services.streaming import stream_to_chat
 from bot.services.typing import typing_until
+
+from bot.handlers.feedback import feedback_keyboard
 
 router = Router()
 
@@ -25,12 +28,19 @@ async def _send_media(
             interface="telegram",
         )
         events = await backend.send_message(chat_id, content, media=media, mime=mime)
-        await stream_to_chat(message, events)
+        sent, msg_id = await stream_to_chat(message, events)
+        if sent and msg_id:
+            try:
+                await sent.edit_reply_markup(reply_markup=feedback_keyboard(msg_id))
+            except Exception:
+                pass  # не критично если кнопки не прикрепились
+    except httpx.HTTPStatusError as e:
+        if e.response.status_code == 403:
+            await message.answer("Ваш запрос заблокирован — он нарушает правила использования.")
+        else:
+            await message.answer("Не удалось получить ответ. Попробуйте позже.")
     except Exception:
-        await message.answer("Не удалось обработать файл. Попробуйте позже.")
-    finally:
-        stop.set()
-        await task
+        await message.answer("Не удалось получить ответ. Попробуйте позже.")
 
 
 @router.message(F.photo)

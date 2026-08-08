@@ -25,7 +25,7 @@ class BackendClient:
         content: str,
         media: bytes | None = None,
         mime: str | None = None,
-    ) -> AsyncIterator[str]:
+    ) -> AsyncIterator[dict]:
         return self._stream_tokens(chat_id, content, media, mime)
 
     async def _stream_tokens(
@@ -34,7 +34,7 @@ class BackendClient:
         content: str,
         media: bytes | None = None,
         mime: str | None = None,
-    ) -> AsyncIterator[str]:
+    ) -> AsyncIterator[dict]:
         if media and mime:
             files = {"file": ("file", media, mime)}
             data = {"content": content}
@@ -51,19 +51,14 @@ class BackendClient:
             resp.raise_for_status()
             async for line in resp.aiter_lines():
                 if line.startswith("data: "):
-                    payload = line[6:]
                     try:
-                        parsed = json.loads(payload)
-                        if isinstance(parsed, dict):
-                            if parsed.get("type") == "token":
-                                yield parsed["delta"]
-                            elif parsed.get("type") == "done":
+                        event = json.loads(line[6:])
+                        if isinstance(event, dict):
+                            if event.get("type") == "done":
                                 break
-                        elif isinstance(parsed, str):
-                            yield parsed
+                            yield event
                     except json.JSONDecodeError:
-                        if payload == "[DONE]":
-                            break
+                        pass   
 
     async def clear_messages(self, chat_id: UUID) -> None:
         r = await self._http.delete(f"/chats/{chat_id}/messages", headers=self._headers)
@@ -71,3 +66,32 @@ class BackendClient:
 
     async def aclose(self) -> None:
         await self._http.aclose()
+        
+    async def post_feedback(
+        self, chat_id: UUID, message_id: str, owner_external_id: str, value: str
+    ) -> None:
+        r = await self._http.post(
+            f"/chats/{chat_id}/messages/{message_id}/feedback",
+            json={"value": value, "owner_external_id": owner_external_id},
+        )
+        r.raise_for_status()
+
+    async def get_admin_stats(self) -> dict:
+        r = await self._http.get("/chats/admin/stats", headers=self._headers)
+        r.raise_for_status()
+        return r.json()
+
+    async def get_admin_users(self, limit: int = 10) -> list[dict]:
+        r = await self._http.get(f"/chats/admin/users?limit={limit}", headers=self._headers)
+        r.raise_for_status()
+        return r.json()
+
+    async def post_admin_broadcast(self, message: str) -> dict:
+        r = await self._http.post(
+            "/chats/admin/broadcast",
+            json={"message": message, "interface_filter": "telegram"},
+            headers=self._headers,
+        )
+        r.raise_for_status()
+        return r.json()
+        

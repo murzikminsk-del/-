@@ -41,4 +41,5 @@ def get_chat_service(
         llm_client=request.app.state.openai,
         strategy=settings.chat_context_strategy,
         context_window=settings.chat_context_window,
+        moderation=request.app.state.moderation,   # ← новая строка
     )

@@ -3959,6 +3959,7 @@ source = { virtual = "." }
 dependencies = [
     { name = "aiofiles" },
     { name = "aiogram" },
+    { name = "aiohttp" },
     { name = "alembic" },
     { name = "arize-phoenix-otel" },
     { name = "asyncpg" },
@@ -3990,6 +3991,7 @@ dev = [
 requires-dist = [
     { name = "aiofiles", specifier = ">=23.0" },
     { name = "aiogram", specifier = ">=3.27" },
+    { name = "aiohttp", specifier = ">=3.9" },
     { name = "alembic", specifier = ">=1.13" },
     { name = "arize-phoenix-otel", specifier = ">=0.6" },
     { name = "asyncpg", specifier = ">=0.29" },

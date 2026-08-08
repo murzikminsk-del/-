@@ -5,6 +5,9 @@ from uuid import UUID
 from app.chat.domain import Chat, ChatMessage
 from app.chat.repository import ChatRepository
 
+from app.moderation.domain import ModerationResult
+from app.moderation.service import ModerationService
+
 _enc = tiktoken.get_encoding("o200k_base")
 
 CONTEXT_WINDOW = 8_000
@@ -59,10 +62,11 @@ class ChatService:
         repository: ChatRepository,
         llm_client,
         strategy: str = "sliding",
-        context_window: int = 10,
+        context_window: int = 10, moderation: ModerationService | None = None
     ):
         self._repo = repository
         self._llm = llm_client
+        self._moderation = moderation
         self._strategy = strategy
         self._context_window = context_window
 
@@ -76,6 +80,11 @@ class ChatService:
 
     async def get_chat(self, chat_id: UUID) -> Chat | None:
         return await self._repo.get_chat(chat_id)
+    
+    async def check_input(self, text: str, owner_external_id: str | None = None) -> ModerationResult:
+        if self._moderation is None:
+            return ModerationResult(allowed=True, layer="passed")
+        return await self._moderation.check_input(text, owner_external_id=owner_external_id)    
 
     async def _build_context(self, chat: Chat) -> list[dict]:
         if self._strategy == "hybrid":
@@ -115,7 +124,7 @@ class ChatService:
         return resp.choices[0].message.content.strip()
 
     async def send_message(
-        self, chat_id: UUID, user_content: str, media_part: dict | None = None) -> AsyncIterator[str]:
+        self, chat_id: UUID, user_content: str, media_part: dict | None = None) -> AsyncIterator[dict]:
         chat = await self._repo.get_chat(chat_id)
         if chat is None:
             raise ValueError(f"Chat {chat_id} not found")
@@ -144,14 +153,15 @@ class ChatService:
             delta = chunk.choices[0].delta.content or ""
             if delta:
                 full_response.append(delta)
-                yield delta
+                yield {"type": "token", "delta": delta}
 
         assistant_text = "".join(full_response)
         if assistant_text:
             assistant_msg = ChatMessage(
                 chat_id=chat_id, role="assistant", content=assistant_text
             )
-            await self._repo.append_message(chat_id, assistant_msg)
+            saved = await self._repo.append_message(chat_id, assistant_msg)
+            yield {"type": "message_saved", "message_id": str(saved.id)}
 
     async def clear_history(self, chat_id: UUID) -> None:
         await self._repo.soft_delete_messages(chat_id)

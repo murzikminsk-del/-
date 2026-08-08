@@ -18,6 +18,10 @@ from app.observability.logging import setup_logging
 from app.routers import chat, health, models
 from app.chat.routes import router as chat_router
 
+from app.moderation.service import ModerationService
+from app.admin.routes import router as admin_router
+
+
 setup_logging()
 
 logger = structlog.get_logger("llm-service")
@@ -31,7 +35,9 @@ async def lifespan(app: FastAPI):
         timeout=settings.llm.request_timeout,
         max_retries=settings.llm.max_retries,
         http_client=httpx.AsyncClient(trust_env=False, verify=False),
+        
     )
+    app.state.moderation = ModerationService(llm_client=app.state.openai)
     app.state.cache = Redis.from_url(settings.redis_url, protocol=2)
     app.state.canary = "CANARY_" + secrets.token_hex(4)
 
@@ -68,3 +74,4 @@ app.include_router(chat.router)
 app.include_router(health.router)
 app.include_router(models.router)
 app.include_router(chat_router)
+app.include_router(admin_router)

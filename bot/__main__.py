@@ -3,6 +3,7 @@ import logging
 import ssl
 
 import httpx
+from aiohttp import web
 from aiogram import Bot, Dispatcher
 from aiogram.client.session.aiohttp import AiohttpSession
 from aiogram.fsm.storage.memory import MemoryStorage
@@ -20,6 +21,21 @@ class NoVerifySession(AiohttpSession):
         ssl_ctx.check_hostname = False
         ssl_ctx.verify_mode = ssl.CERT_NONE
         self._connector_init["ssl"] = ssl_ctx
+
+
+async def make_notify_app(bot: Bot) -> web.Application:
+    app = web.Application()
+
+    async def notify(request: web.Request) -> web.Response:
+        token = request.headers.get("X-Internal-Token", "")
+        if token != settings.internal_token.get_secret_value():
+            return web.Response(status=403, text="forbidden")
+        data = await request.json()
+        await bot.send_message(chat_id=data["chat_id"], text=data["text"])
+        return web.json_response({"status": "ok"})
+
+    app.router.add_post("/notify", notify)
+    return app
 
 
 async def main() -> None:
@@ -45,11 +61,20 @@ async def main() -> None:
         BotCommand(command="clear", description="Очистить историю"),
         BotCommand(command="cancel", description="Отменить сценарий"),
         BotCommand(command="help", description="Справка"),
+        BotCommand(command="stats", description="Статистика (админ)"),
+        BotCommand(command="broadcast", description="Рассылка (админ)"),
     ])
+
+    notify_app = await make_notify_app(bot)
+    runner = web.AppRunner(notify_app)
+    await runner.setup()
+    site = web.TCPSite(runner, "0.0.0.0", 9000)
+    await site.start()
 
     try:
         await dp.start_polling(bot)
     finally:
+        await runner.cleanup()
         await backend.aclose()
         await bot.session.close()
 

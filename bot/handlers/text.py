@@ -1,9 +1,11 @@
 import asyncio
+import httpx
 
 from aiogram import F, Router
 from aiogram.fsm.context import FSMContext
 from aiogram.types import Message
 
+from bot.handlers.feedback import feedback_keyboard
 from bot.services.backend_client import BackendClient
 from bot.services.streaming import stream_to_chat
 from bot.services.typing import typing_until
@@ -24,9 +26,16 @@ async def handle_text(message: Message, backend: BackendClient, state: FSMContex
             interface="telegram",
         )
         events = await backend.send_message(chat_id, message.text)
-        await stream_to_chat(message, events)
+        sent, msg_id = await stream_to_chat(message, events)
+        if sent and msg_id:
+            try:
+                await sent.edit_reply_markup(reply_markup=feedback_keyboard(msg_id))
+            except Exception:
+                pass  # не критично если кнопки не прикрепились
+    except httpx.HTTPStatusError as e:
+        if e.response.status_code == 403:
+            await message.answer("Ваш запрос заблокирован — он нарушает правила использования.")
+        else:
+            await message.answer("Не удалось получить ответ. Попробуйте позже.")
     except Exception:
         await message.answer("Не удалось получить ответ. Попробуйте позже.")
-    finally:
-        stop.set()
-        await task

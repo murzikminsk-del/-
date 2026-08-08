@@ -328,3 +328,69 @@ python -m bot (второй терминал) = Telegram = это как бра�
 | Голосовое | `audio/ogg` | Whisper-1 — транскрипция → ответ |
 | PDF | `application/pdf` | pypdf — извлечение текста |
 | DOCX | `application/vnd.openxmlformats-officedocument.wordprocessingml.document` | python-docx — извлечение текста |
+
+## Блок 4.4 — Production-обвязка
+
+Добавлены модерация входящих запросов, обратная связь (👍/👎), административные эндпоинты и полный `docker-compose.yml` для prod-деплоя.
+
+**Что сделано:**
+
+**Модерация (двухслойная):**
+- `app/moderation/domain.py` — `ModerationResult` (dataclass: allowed, categories, layer)
+- `app/moderation/service.py` — `ModerationService`: сначала regex-фильтр по `DEFAULT_BLOCKLIST` (fail-fast), затем OpenAI `omni-moderation-latest` (fail-open при ошибке API). Логирует через structlog с `prompt_hash` и маскированием PII
+- `app/chat/service.py` — метод `check_input()`, вызывается до генерации ответа. При блокировке маршрут возвращает 403
+- `app/chat/routes.py` — проверка модерации перед SSE; события стрима типизированы: `{"type":"token","delta":"..."}`, `{"type":"message_saved","message_id":"..."}`, `{"type":"done"}`
+
+**Обратная связь:**
+- Миграция `alembic/versions/0002_production.py` — таблицы `message_feedback` (составной PK: `owner_external_id` + `message_id`) и `broadcasts`
+- `app/chat/routes.py` — `POST /chats/{chat_id}/messages/{message_id}/feedback` с `ON CONFLICT DO NOTHING`
+- `bot/handlers/feedback.py` — кнопки 👍/👎 после каждого ответа бота; после нажатия клавиатура убирается
+- `bot/services/streaming.py` — `stream_to_chat` возвращает `tuple[Message | None, str | None]` (сообщение + `message_id`)
+
+**Административные эндпоинты (`/chats/admin`):**
+- `app/admin/routes.py` — авторизация через `X-Admin-Token` header, эндпоинты:
+  - `GET /stats` — активные чаты и сообщения за последние 24 часа
+  - `GET /users` — список уникальных пользователей
+  - `POST /broadcast` — рассылка всем пользователям через Telegram с anti-flood (asyncio.create_task, задержка 0.04 с ≈ 25 сообщений/сек)
+- `bot/handlers/admin.py` — команды `/stats`, `/users`, `/broadcast` только для adminids (фильтр `IsAdmin` на уровне router)
+- `bot/__main__.py` — aiohttp-сервер на порту 9000 (`/notify` endpoint) работает параллельно с aiogram polling
+
+**Docker Compose:**
+- `docker-compose.yml` — сервисы `postgres`, `redis`, `app`, `bot` с healthcheck и `depends_on: service_healthy`
+- `app` запускается командой `alembic upgrade head && uvicorn ...` — миграции применяются автоматически
+- Переменные из `.env` + environment-overrides для docker-сети (хост `postgres` вместо `localhost`)
+
+### Переменные окружения (дополнения к блоку 4.1)
+
+| Переменная | Описание |
+|------------|----------|
+| `ADMIN_TOKEN` | Токен для `/chats/admin` эндпоинтов |
+| `INTERNAL_TOKEN` | Токен для внутреннего `/notify` эндпоинта бота |
+| `BOT_URL` | URL бота для broadcast (в Docker: `http://bot:9000`) |
+| `BOT_ADMIN_IDS` | Список Telegram user ID администраторов (JSON-формат: `[123456789]`) |
+
+### Запуск через Docker Compose
+
+```bash
+cp .env.example .env
+# заполнить .env: BOT_TOKEN, OPENAI_API_KEY, ADMIN_TOKEN, INTERNAL_TOKEN, BOT_ADMIN_IDS=[ваш_id]
+docker compose up --build
+```
+
+Сервис готов, когда `app` показывает `Application startup complete`. Миграции применяются автоматически.
+
+### Запуск локально (без Docker, для разработки)
+
+```bash
+# Терминал 1 — backend
+uvicorn app.main:app --reload
+
+# Терминал 2 — бот
+python -m bot
+```
+
+### Проверка модерации
+
+Фраза, содержащая запрещённое слово из `DEFAULT_BLOCKLIST`:
+- Backend: возвращает HTTP 403
+- Бот: показывает сообщение «Ваш запрос заблокирован — он нарушает правила использования.»
