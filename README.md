@@ -482,3 +482,55 @@ SELECT * FROM chats;
 python -m scripts.test_cache   # первый запуск — запрос в API (~3–4 с)
 python -m scripts.test_cache   # второй запуск — из дискового кеша (~0.5 с)
 ```
+
+## Блок 5.2 — Векторные базы данных
+
+Добавлен Qdrant как векторное хранилище: документы проиндексированы, реализован сервис поиска с фильтрацией, проведён эксперимент cosine vs dot product.
+
+### Что сделано
+
+- `docker-compose.yml` — добавлен сервис `qdrant` (образ v1.14.0, порты 6333/6334, named volume `qdrant_storage`, healthcheck, `restart: unless-stopped`)
+- `app/services/vector_store.py` — async-обёртка над `AsyncQdrantClient`:
+  - `ensure_collection()` — создаёт коллекцию при отсутствии, проверяет размерность при наличии, бросает `VectorStoreDimensionMismatch` при несовпадении
+  - `upsert()` — батчами по 256, `wait=True` только на последнем батче
+  - `search()` — через `query_points`, возвращает `list[ScoredPoint]`
+  - `count()` и `close()`
+  - Payload-индексы: `source` (KEYWORD), `created_at` (DATETIME), `category` (KEYWORD)
+  - HNSW: дефолт Qdrant `m=16, ef_construct=100` — для ~1300 документов избыточная настройка нецелесообразна
+- `data/docs/` — 4 реальных юридических документа (DOCX): договор подряда, концессионное соглашение, устав ООО, политика обработки ПД
+- `data/generate_sample.py` — нарезает DOCX на чанки по абзацам (мин. 40 символов), определяет категорию по имени файла, пишет JSONL
+- `data/sample_kb.jsonl` — 1308 чанков из 4 документов, категории: `legal`, `concession`, `corporate`, `compliance`
+- `scripts/load_to_qdrant.py` — идемпотентный загрузчик: детерминированные UUID через `uuid5(NAMESPACE_URL, source:chunk_index)`, батчинг 256, tqdm-прогрессбар
+- `docs/vector_store.md` — результаты эксперимента cosine vs dot и примеры трёх типов фильтров
+
+### Корпус документов
+
+| Файл | Категория | Чанков |
+|------|-----------|--------|
+| КС Вологда (концессионное соглашение) | `concession` | ~900 |
+| Договор подряда | `legal` | ~200 |
+| Политика обработки персональных данных | `compliance` | ~100 |
+| Устав ООО | `corporate` | ~108 |
+
+### Cosine vs Dot Product
+
+`text-embedding-3-small` возвращает нормализованные векторы, поэтому cosine и dot дают математически идентичное ранжирование (подтверждено на 5 запросах). В production используется **COSINE** — при замене модели на ненормализованную поведение останется корректным.
+
+### Новые переменные окружения
+
+| Переменная | Описание | По умолчанию |
+|------------|----------|--------------|
+| `QDRANT_URL` | Адрес Qdrant | `http://localhost:6333` |
+| `QDRANT_API_KEY` | API-ключ Qdrant | — |
+| `QDRANT_COLLECTION` | Имя коллекции | `documents` |
+| `EMBEDDING_DIM` | Размерность векторов | `1536` |
+
+### Запуск Qdrant и индексация
+
+```bash
+docker compose -f docker-compose.yml up -d qdrant
+python -m scripts.load_to_qdrant   # первый запуск — загружает 1308 точек
+python -m scripts.load_to_qdrant   # повторный — points_count не меняется (idempotent)
+```
+
+Дашборд: http://localhost:6333/dashboard

@@ -29,6 +29,10 @@ class Settings(BaseSettings):
     redis_url: str = "redis://localhost:6379/0"
     cache_ttl_seconds: int = 3600
     embedding_model: str = "text-embedding-3-small"
+    qdrant_url: str = "http://localhost:6333"
+    qdrant_api_key: str | None = None
+    qdrant_collection: str = "documents"
+    embedding_dim: int = 1536
     llm: LLMSettings = Field(default_factory=LLMSettings)
 
     # chat

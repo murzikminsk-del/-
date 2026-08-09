@@ -2,6 +2,7 @@ import hashlib
 from pathlib import Path
 
 import diskcache
+import httpx
 from openai import AsyncOpenAI
 from tenacity import retry, stop_after_attempt, wait_exponential
 
@@ -21,7 +22,10 @@ async def _fetch_embeddings(client: AsyncOpenAI, texts: list[str], model: str) -
 async def embed_texts(texts: list[str]) -> list[list[float]]:
     settings = get_settings()
     model = settings.embedding_model
-    client = AsyncOpenAI(api_key=settings.llm.openai_api_key.get_secret_value())
+    client = AsyncOpenAI(
+        api_key=settings.llm.openai_api_key.get_secret_value(),
+        http_client=httpx.AsyncClient(trust_env=False),
+    )
       
     results: list[list[float] | None] = [None] * len(texts)
     uncached_indices: list[int] = []
