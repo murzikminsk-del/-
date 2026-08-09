@@ -20,6 +20,9 @@ COPY . .
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --frozen --no-dev
 
+ENV TIKTOKEN_CACHE_DIR=/app/.tiktoken_cache
+RUN /app/.venv/bin/python -c "import tiktoken; tiktoken.get_encoding('o200k_base')"
+
 
 FROM python:3.11-slim-bookworm AS runtime
 
@@ -27,10 +30,13 @@ RUN useradd --create-home --uid 1000 appuser
 
 COPY --from=builder --chown=appuser:appuser /app /app
 
+WORKDIR /app
+
 USER appuser
 
 ENV PATH="/app/.venv/bin:$PATH" \
-    PYTHONPATH="/app"
+    PYTHONPATH="/app" \
+    TIKTOKEN_CACHE_DIR=/app/.tiktoken_cache
 
 EXPOSE 8000
 

@@ -369,13 +369,25 @@ python -m bot (второй терминал) = Telegram = это как бра�
 | `BOT_URL` | URL бота для broadcast (в Docker: `http://bot:9000`) |
 | `BOT_ADMIN_IDS` | Список Telegram user ID администраторов (JSON-формат: `[123456789]`) |
 
+### Важные исправления при портировании на Docker
+
+При запуске через Docker потребовались следующие доработки (не очевидные заранее):
+
+- **`Dockerfile`** — добавлен `WORKDIR /app` в runtime-стадию (иначе alembic не находил `alembic.ini`) и предзагрузка tiktoken-словаря во время сборки образа (`TIKTOKEN_CACHE_DIR=/app/.tiktoken_cache`) — при старте контейнер не имеет доступа к `openaipublic.blob.core.windows.net` через VPN
+- **`alembic/env.py`** — добавлено чтение `DATABASE_URL` из переменной окружения (иначе alembic использовал `localhost` из `alembic.ini` вместо `postgres` из docker-сети); переписана `run_migrations_online` по стандартному async-паттерну (`do_run_migrations` + `connection.run_sync`)
+- **`app/chat/repositories/pg_models.py`** — добавлен явный `DateTime(timezone=True)` для всех timestamp-колонок (без него SQLAlchemy генерировал `TIMESTAMP WITHOUT TIME ZONE`, несовместимый с timezone-aware datetime из кода)
+- **`bot/handlers/__init__.py`** — добавлены `admin.router` и `feedback.router` в список (без этого callback-кнопки 👍/👎 не обрабатывались)
+- **`pyproject.toml`** — `garak` вынесен из основных зависимостей (тянул за собой весь CUDA/torch стек ~2 ГБ), добавлен `jinja2`
+
 ### Запуск через Docker Compose
 
 ```bash
 cp .env.example .env
 # заполнить .env: BOT_TOKEN, OPENAI_API_KEY, ADMIN_TOKEN, INTERNAL_TOKEN, BOT_ADMIN_IDS=[ваш_id]
-docker compose up --build
+docker compose -f docker-compose.yml up --build
 ```
+
+> **Важно:** если в проекте есть старый `compose.yaml`, запускать нужно явно через `-f docker-compose.yml` — иначе Docker объединит оба файла.
 
 Сервис готов, когда `app` показывает `Application startup complete`. Миграции применяются автоматически.
 
@@ -394,3 +406,39 @@ python -m bot
 Фраза, содержащая запрещённое слово из `DEFAULT_BLOCKLIST`:
 - Backend: возвращает HTTP 403
 - Бот: показывает сообщение «Ваш запрос заблокирован — он нарушает правила использования.»
+
+### Просмотр данных в PostgreSQL
+
+Подключиться к базе данных:
+
+```bash
+docker exec -it rag-document-assistant-postgres-1 psql -U rag -d rag
+```
+
+Полезные запросы внутри psql:
+
+```sql
+-- просмотр всех оценок пользователей
+SELECT * FROM message_feedback;
+
+-- статистика: количество сообщений и уникальных пользователей за сутки
+SELECT COUNT(*) AS messages,
+       COUNT(DISTINCT owner_external_id) AS users
+FROM chat_messages
+WHERE created_at > NOW() - INTERVAL '24 hours';
+
+-- все чаты
+SELECT * FROM chats;
+```
+
+Выход из psql: `\q`
+
+### Статистика через Telegram-бот
+
+Команды доступны только пользователям из `BOT_ADMIN_IDS`:
+
+| Команда | Что показывает |
+|---------|----------------|
+| `/stats` | Сообщений за 24ч, DAU, feedback ratio |
+| `/users` | Список всех пользователей |
+| `/broadcast текст` | Отправить сообщение всем пользователям |
