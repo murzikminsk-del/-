@@ -21,6 +21,9 @@ from app.chat.routes import router as chat_router
 from app.moderation.service import ModerationService
 from app.admin.routes import router as admin_router
 
+from app.services.rag import RAGService
+from app.rag.routes import router as rag_router
+
 
 setup_logging()
 
@@ -44,12 +47,17 @@ async def lifespan(app: FastAPI):
     engine = create_async_engine(settings.database_url, pool_pre_ping=True)
     app.state.session_factory = async_sessionmaker(engine, expire_on_commit=False)
     app.state.db_engine = engine
+    rag = RAGService(settings)
+    rag.build()
+    app.state.rag = rag
 
     yield
 
+    await app.state.rag.close()
     await app.state.openai.close()
     await app.state.cache.aclose()
     await engine.dispose()
+    
 
 app = FastAPI(lifespan=lifespan)
 
@@ -75,3 +83,4 @@ app.include_router(health.router)
 app.include_router(models.router)
 app.include_router(chat_router)
 app.include_router(admin_router)
+app.include_router(rag_router)

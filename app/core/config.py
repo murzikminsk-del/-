@@ -18,9 +18,10 @@ class Settings(BaseSettings):
         env_file=".env",
         env_file_encoding="utf-8",
         env_nested_delimiter="__",
-        extra="ignore",
-        
+        extra="ignore",        
     )
+    
+    
 
     app_name: str = "llm-service"
     company_name: str = "Acme"
@@ -44,6 +45,16 @@ class Settings(BaseSettings):
     admin_token: SecretStr = SecretStr("change-me-admin")
     internal_token: SecretStr = SecretStr("change-me-internal")
     bot_url: str = "http://bot:9000"
+    
+    # rag
+    rag_data_dir: Path = Path("data/rag-block-03")
+    rag_collection: str = "rag_block_03"
+    rag_collection_bare: str = "rag_block_03_bare"
+    rag_llm_model: str = "gpt-4o-mini"
+    rag_top_k: int = 3
+    rag_chunk_size: int = 512
+    rag_chunk_overlap: int = 64
+    rag_score_threshold: float = 0.3
 
 @lru_cache
 def get_settings() -> Settings:

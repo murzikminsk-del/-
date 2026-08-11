@@ -29,7 +29,10 @@ dependencies = [
     "diskcache>=5.6",
     "tqdm>=4.66",
     "socksio>=1.0",
-    "qdrant-client>=1.14",
+    "qdrant-client>=1.14,<1.16",
+    "llama-index>=0.14.22",
+    "llama-index-vector-stores-qdrant>=0.8.8",
+    "llama-index-readers-file>=0.6.0",
 ]
 
 [dependency-groups]

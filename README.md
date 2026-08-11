@@ -534,3 +534,70 @@ python -m scripts.load_to_qdrant   # повторный — points_count не м
 ```
 
 Дашборд: http://localhost:6333/dashboard
+
+## Блок 5.3 — Архитектура RAG с LlamaIndex
+
+Поверх векторного хранилища собран минимальный, но рабочий RAG-пайплайн на LlamaIndex. Параллельно реализована bare-metal версия — без фреймворка, для понимания того, что LlamaIndex инкапсулирует.
+
+### Что сделано
+
+- `app/services/rag.py` — `RAGService` на LlamaIndex: `SimpleDirectoryReader → SentenceSplitter → QdrantVectorStore → VectorStoreIndex → QueryEngine`. Индексирует корпус при первом запуске, при повторном — подключается к готовой коллекции (`from_vector_store`). Async query engine (`aquery`) совместим с FastAPI без дополнительных обёрток
+- `app/services/rag_baremetal.py` — `BareMetalRAG`: тот же путь руками — чтение `.md` файлов, эмбеддинги через OpenAI API, upsert в Qdrant с плоским payload `{text, source}`, `query_points`, сборка промпта, `chat.completions.create`
+- `app/services/loader_utils.py` — утилита `stable_id` (uuid5 для идемпотентного upsert)
+- `app/rag/routes.py` — `POST /rag/query` с телом `{"question": "..."}`, ответ: `{answer, top_score, sources}`. Индекс инициализируется один раз через `lifespan`, не на каждый запрос
+- `data/rag-block-03/` — 10 `.md` файлов (конвертированы из DOCX через pandoc): 9 юридических документов + `offtopic_geography.md` для проверки fallback
+- `docs/rag.md` — версии зависимостей, решение по коллекциям, таблица LlamaIndex vs bare-metal, прогон 5 вопросов
+
+### Corpus
+
+| Файл | Тип |
+|------|-----|
+| Договор аренды нежилого помещения.md | legal |
+| Договор возмездного оказания услуг.md | legal |
+| Договор процентного займа.md | legal |
+| Договор подряда.md | legal |
+| Соглашение о конфиденциальности.md | legal |
+| Трудовой договор с работником.md | legal |
+| Форма_ Устав ООО.md | corporate |
+| Политика оператора в отношении обработки ПД.md | compliance |
+| КС Вологда.md | concession |
+| offtopic_geography.md | нерелевантный (контроль fallback) |
+
+### Новые переменные окружения
+
+| Переменная | Описание | По умолчанию |
+|------------|----------|--------------|
+| `RAG_COLLECTION` | Коллекция LlamaIndex RAG | `rag_block_03` |
+| `RAG_COLLECTION_BARE` | Коллекция bare-metal RAG | `rag_block_03_bare` |
+| `RAG_LLM_MODEL` | Модель для генерации | `gpt-4.1-mini` |
+| `RAG_TOP_K` | Кол-во чанков в контексте | `3` |
+| `RAG_CHUNK_SIZE` | Размер чанка (токенов) | `512` |
+| `RAG_CHUNK_OVERLAP` | Перекрытие чанков | `64` |
+| `RAG_SCORE_THRESHOLD` | Порог релевантности | `0.3` |
+
+### Проверка
+
+```bash
+# Запуск сервиса (индексирует корпус при первом старте)
+$env:HTTPS_PROXY="socks5://127.0.0.1:10808"; uv run uvicorn app.main:app --reload
+
+# Запрос через curl
+curl -X POST http://localhost:8000/rag/query \
+  -H "Content-Type: application/json" \
+  -d '{"question": "Каков размер неустойки за просрочку арендной платы?"}'
+
+# Или через Swagger
+http://localhost:8000/docs → POST /rag/query
+```
+
+### Результаты прогона 5 вопросов
+
+| Вопрос | Тип | top_score | Результат |
+|--------|-----|-----------|-----------|
+| Размер неустойки за просрочку аренды? | хороший | 0.637 | Точный ответ |
+| Права участника ООО? | хороший | 0.526 | Частичный ответ (устав ссылается на ГК РФ) |
+| Срок хранения персональных данных? | хороший | 0.655 | Честный ответ (конкретная цифра не в чанке) |
+| Форс-мажор по нескольким договорам? | средний | 0.518 | Честный отказ (синтез из нескольких источников) |
+| Ставка рефинансирования ЦБ сегодня? | вне базы | 0.369 | Fallback сработал корректно |
+
+Подробнее — в `docs/rag.md`.
