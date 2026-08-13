@@ -53,7 +53,7 @@ class Settings(BaseSettings):
     rag_llm_model: str = "gpt-4o-mini"
     rag_top_k: int = 3
     rag_chunk_size: int = 512
-    rag_chunk_overlap: int = 64
+    rag_chunk_overlap: int = 32
     rag_score_threshold: float = 0.3
 
 @lru_cache
